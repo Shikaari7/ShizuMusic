@@ -91,30 +91,38 @@ def _db_track(chat_id: int, user_id: int):
 # ASSISTANT CHECK
 # ─────────────────────────────────────────────
 
-async def _is_assistant_in(
-    chat_id: int,
-    assistant_username: str,
-):
+async def _is_assistant_in(chat_id: int):
 
-    from ShizuMusic import assistant
+    """
+    Returns:
+        True
+        False
+        "banned"
+    """
 
     try:
 
+        me = await assistant.get_me()
+
         member = await assistant.get_chat_member(
             chat_id,
-            assistant_username,
+            me.id
         )
 
         return member.status is not None
 
     except Exception as e:
 
-        err = str(e).lower()
+        err = str(e)
 
-        if "banned" in err:
+        if (
+            "USER_BANNED" in err
+            or "Banned" in err
+        ):
             return "banned"
 
         return False
+        
 
 
 # ─────────────────────────────────────────────
@@ -123,41 +131,20 @@ async def _is_assistant_in(
 
 async def _try_join_assistant(
     chat_id: int,
-    pm: Message,
+    pm: Message
 ) -> bool:
-
-    from ShizuMusic import assistant
 
     try:
 
-        me = await assistant.get_me()
-
-        # already joined check
-        try:
-
-            member = await assistant.get_chat_member(
-                chat_id,
-                me.id,
-            )
-
-            if member:
-                return True
-
-        except Exception:
-            pass
-
-        # export invite link
         invite_link = await bot.export_chat_invite_link(
             chat_id
         )
 
-    except Exception:
+    except Exception as e:
 
         await pm.edit_text(
-            "<b>❍ ʙᴏᴛ ɴᴇᴇᴅs ɪɴᴠɪᴛᴇ ʟɪɴᴋ ᴘᴇʀᴍɪssɪᴏɴ</b>\n\n"
-            "<b>❍ ᴍᴀᴋᴇ sᴜʀᴇ :</b>\n"
-            "• <code>Bot is Admin</code>\n"
-            "• <code>Invite via Link enabled</code>",
+            f"<b>❍ ɪ ɴᴇᴇᴅ ɪɴᴠɪᴛᴇ ʟɪɴᴋ ᴘᴇʀᴍɪssɪᴏɴ</b>\n"
+            f"<code>{e}</code>",
             parse_mode=ParseMode.HTML,
         )
 
@@ -165,19 +152,14 @@ async def _try_join_assistant(
 
     try:
 
-        # private group fix
-        if invite_link.startswith(
-            "https://t.me/+"
-        ):
+        if invite_link.startswith("https://t.me/+"):
 
             invite_link = invite_link.replace(
                 "https://t.me/+",
                 "https://t.me/joinchat/",
             )
 
-        await assistant.join_chat(
-            invite_link
-        )
+        await assistant.join_chat(invite_link)
 
         await asyncio.sleep(2)
 
@@ -189,43 +171,9 @@ async def _try_join_assistant(
 
     except RPCError as e:
 
-        err = str(e).lower()
-
-        # expired link auto retry
-        if (
-            "expired" in err
-            or "invalid" in err
-        ):
-
-            try:
-
-                invite_link = await bot.export_chat_invite_link(
-                    chat_id
-                )
-
-                if invite_link.startswith(
-                    "https://t.me/+"
-                ):
-
-                    invite_link = invite_link.replace(
-                        "https://t.me/+",
-                        "https://t.me/joinchat/",
-                    )
-
-                await assistant.join_chat(
-                    invite_link
-                )
-
-                await asyncio.sleep(2)
-
-                return True
-
-            except Exception:
-                pass
-
         await pm.edit_text(
             f"<b>❍ ᴀssɪsᴛᴀɴᴛ ᴊᴏɪɴ ғᴀɪʟᴇᴅ</b>\n"
-            f"<code>{e.MESSAGE}</code>",
+            f"<code>{e}</code>",
             parse_mode=ParseMode.HTML,
         )
 
