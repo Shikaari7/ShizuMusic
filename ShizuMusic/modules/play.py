@@ -18,7 +18,10 @@ from pyrogram.types import (
 
 import config
 
-from ShizuMusic import bot
+from ShizuMusic import (
+    assistant,
+    bot,
+)
 from ShizuMusic.core.player import play_song
 from ShizuMusic.core.queue import (
     add_to_queue,
@@ -127,27 +130,34 @@ async def _try_join_assistant(
 
     try:
 
-        chat = await bot.get_chat(chat_id)
+        me = await assistant.get_me()
 
-        if chat.username:
+        # already joined check
+        try:
 
-            link = f"https://t.me/{chat.username}"
+            member = await assistant.get_chat_member(
+                chat_id,
+                me.id,
+            )
 
-        else:
+            if member:
+                return True
 
-            try:
-                link = await bot.export_chat_invite_link(chat_id)
+        except Exception:
+            pass
 
-            except Exception:
-                link = None
+        # export invite link
+        invite_link = await bot.export_chat_invite_link(
+            chat_id
+        )
 
     except Exception:
-        link = None
-
-    if not link:
 
         await pm.edit_text(
-            "<b>❍ ᴀᴅᴅ ᴀssɪsᴛᴀɴᴛ ᴍᴀɴᴜᴀʟʟʏ</b>",
+            "<b>❍ ʙᴏᴛ ɴᴇᴇᴅs ɪɴᴠɪᴛᴇ ʟɪɴᴋ ᴘᴇʀᴍɪssɪᴏɴ</b>\n\n"
+            "<b>❍ ᴍᴀᴋᴇ sᴜʀᴇ :</b>\n"
+            "• <code>Bot is Admin</code>\n"
+            "• <code>Invite via Link enabled</code>",
             parse_mode=ParseMode.HTML,
         )
 
@@ -155,23 +165,63 @@ async def _try_join_assistant(
 
     try:
 
-        if "https://t.me/+" in link:
+        # private group fix
+        if invite_link.startswith(
+            "https://t.me/+"
+        ):
 
-            link = link.replace(
+            invite_link = invite_link.replace(
                 "https://t.me/+",
                 "https://t.me/joinchat/",
             )
 
-        await assistant.join_chat(link)
+        await assistant.join_chat(
+            invite_link
+        )
 
         await asyncio.sleep(2)
 
         return True
 
     except UserAlreadyParticipant:
+
         return True
 
     except RPCError as e:
+
+        err = str(e).lower()
+
+        # expired link auto retry
+        if (
+            "expired" in err
+            or "invalid" in err
+        ):
+
+            try:
+
+                invite_link = await bot.export_chat_invite_link(
+                    chat_id
+                )
+
+                if invite_link.startswith(
+                    "https://t.me/+"
+                ):
+
+                    invite_link = invite_link.replace(
+                        "https://t.me/+",
+                        "https://t.me/joinchat/",
+                    )
+
+                await assistant.join_chat(
+                    invite_link
+                )
+
+                await asyncio.sleep(2)
+
+                return True
+
+            except Exception:
+                pass
 
         await pm.edit_text(
             f"<b>❍ ᴀssɪsᴛᴀɴᴛ ᴊᴏɪɴ ғᴀɪʟᴇᴅ</b>\n"
