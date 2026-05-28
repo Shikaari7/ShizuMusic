@@ -15,6 +15,7 @@ ALL_MODULES = [
     "pause",
     "resume",
     "skip",
+    "stats",
     "stop",
     "ping",
     "broadcast",
