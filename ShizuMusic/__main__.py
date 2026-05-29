@@ -6,7 +6,6 @@
 #  from this source code is strictly prohibited.
 # --------------------------------------------------------------------------------
 
-
 import asyncio
 import importlib
 import os
@@ -24,7 +23,6 @@ import config
 from ShizuMusic import LOGGER, assistant, bot, call_py
 from ShizuMusic.modules import ALL_MODULES
 
-# ── Global assistant username (used in play.py) ───────────────────────────────
 ASSISTANT_USERNAME: str = ""
 
 # ── Flask health check ────────────────────────────────────────────────────────
@@ -46,7 +44,7 @@ def _run_flask() -> None:
     _flask.run(host="0.0.0.0", port=config.PORT, use_reloader=False)
 
 
-# ── Keep-Alive Ping ───────────────────────────────────────────────────────────
+# ── Keep-Alive ────────────────────────────────────────────────────────────────
 
 def _keep_alive() -> None:
     url = os.getenv("RENDER_EXTERNAL_URL", f"http://0.0.0.0:{config.PORT}")
@@ -81,7 +79,7 @@ if __name__ == "__main__":
 
     # 1. MongoDB
     try:
-        from ShizuMusic.database import start_mongo
+        from ShizuMusic.utils.db import start_mongo
         ok = start_mongo()
         if ok:
             LOGGER.info("MongoDB ready.")
@@ -110,7 +108,7 @@ if __name__ == "__main__":
             break
         except Exception as e:
             if "FLOOD_WAIT" in str(e):
-                m = re.search(r"(\d+)", str(e))
+                m    = re.search(r"(\d+)", str(e))
                 wait = min(int(m.group(1)) + 5 if m else 300, 1800)
                 LOGGER.warning(f"FLOOD_WAIT — sleeping {wait}s (attempt {attempt + 1}/10)")
                 time.sleep(wait)
@@ -126,18 +124,16 @@ if __name__ == "__main__":
 
     # 6. Set bot commands
     try:
-        bot.set_bot_commands(
-            [
-                BotCommand("start",  "✧ sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ ✧"),
-                BotCommand("help",   "✧ ɢᴇᴛ ʜᴇʟᴘ ᴍᴇɴᴜ ✧"),
-                BotCommand("play",   "✧ ᴘʟᴀʏ ᴀ sᴏɴɢ ✧"),
-                BotCommand("pause",  "✧ ᴘᴀᴜsᴇ ᴘʟᴀʏʙᴀᴄᴋ ✧"),
-                BotCommand("resume", "✧ ʀᴇsᴜᴍᴇ ᴘʟᴀʏʙᴀᴄᴋ ✧"),
-                BotCommand("skip",   "✧ sᴋɪᴘ sᴏɴɢ ✧"),
-                BotCommand("stop",   "✧ sᴛᴏᴘ & ᴄʟᴇᴀʀ ✧"),
-                BotCommand("ping",   "✧ ʙᴏᴛ sᴛᴀᴛs ✧"),
-            ]
-        )
+        bot.set_bot_commands([
+            BotCommand("start",  "✧ sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ ✧"),
+            BotCommand("help",   "✧ ɢᴇᴛ ʜᴇʟᴘ ᴍᴇɴᴜ ✧"),
+            BotCommand("play",   "✧ ᴘʟᴀʏ ᴀ sᴏɴɢ ✧"),
+            BotCommand("pause",  "✧ ᴘᴀᴜsᴇ ᴘʟᴀʏʙᴀᴄᴋ ✧"),
+            BotCommand("resume", "✧ ʀᴇsᴜᴍᴇ ᴘʟᴀʏʙᴀᴄᴋ ✧"),
+            BotCommand("skip",   "✧ sᴋɪᴘ sᴏɴɢ ✧"),
+            BotCommand("stop",   "✧ sᴛᴏᴘ & ᴄʟᴇᴀʀ ✧"),
+            BotCommand("ping",   "✧ ʙᴏᴛ sᴛᴀᴛs ✧"),
+        ])
         LOGGER.info("Bot commands set")
     except Exception as e:
         LOGGER.warning(f"Could not set bot commands: {e}")
@@ -153,9 +149,9 @@ if __name__ == "__main__":
         LOGGER.error(f"Assistant start failed: {e}")
         sys.exit(1)
 
-    # 8. Block middleware (must run before plugins load)
+    # 8. Block middleware — MUST run before plugins load
     try:
-        from ShizuMusic.decorators import register_block_middleware
+        from ShizuMusic.utils.decorators import register_block_middleware
         register_block_middleware()
         LOGGER.info("Block middleware registered")
     except Exception as e:
@@ -184,7 +180,7 @@ if __name__ == "__main__":
     loop.create_task(watchdog())
     LOGGER.info("Watchdog started")
 
-    LOGGER.info(" ShizuMusic is running")
+    LOGGER.info("ShizuMusic is running")
 
     idle()
 
@@ -200,3 +196,4 @@ if __name__ == "__main__":
         pass
 
     LOGGER.info("✧ ShizuMusic stopped ✧")
+            
