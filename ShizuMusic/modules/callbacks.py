@@ -383,6 +383,14 @@ async def on_callback(client, cbq: CallbackQuery) -> None:
     elif data == "noop":
         await cbq.answer()
 
+    # ── CLOSE HELP ─────────────────────────────────────────────────────────────
+    elif data == "close_help":
+        await cbq.answer()
+        try:
+            await cbq.message.delete()
+        except Exception:
+            pass
+
     # ── HELP ───────────────────────────────────────────────────────────────────
     elif data == "show_help":
         await cbq.answer()
