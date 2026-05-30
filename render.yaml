@@ -41,7 +41,7 @@ services:
       - key: SUPPORT_GROUP
         sync: false
 
-      - key: START_ANIMATION
+      - key: START_ANIMATIONS
         value: https://telegra.ph/file/1a3c152717eb9d2e94dc2.mp4
 
       - key: PING_IMG_URL
