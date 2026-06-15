@@ -464,3 +464,51 @@ def set_nsfw_enabled(chat_id: int, enabled: bool) -> None:
         col.update_one({"_id": chat_id}, {"$set": {"enabled": enabled}}, upsert=True)
     except Exception as e:
         logger.error(f"[DB] set_nsfw_enabled: {e}")
+
+
+# ── NSFW Approved Users (per-chat whitelist) ─────────────────────────────────
+# Approved user di media/text NSFW filter dwara scan nahi hundi.
+
+def approve_nsfw_user(chat_id: int, user_id: int) -> None:
+    col = _col("nsfw_approved")
+    if col is None:
+        return
+    try:
+        col.update_one(
+            {"chat_id": chat_id, "user_id": user_id},
+            {"$set": {"chat_id": chat_id, "user_id": user_id}},
+            upsert=True,
+        )
+    except Exception as e:
+        logger.error(f"[DB] approve_nsfw_user: {e}")
+
+
+def disapprove_nsfw_user(chat_id: int, user_id: int) -> None:
+    col = _col("nsfw_approved")
+    if col is None:
+        return
+    try:
+        col.delete_one({"chat_id": chat_id, "user_id": user_id})
+    except Exception as e:
+        logger.error(f"[DB] disapprove_nsfw_user: {e}")
+
+
+def is_nsfw_approved(chat_id: int, user_id: int) -> bool:
+    col = _col("nsfw_approved")
+    if col is None:
+        return False
+    try:
+        return col.find_one({"chat_id": chat_id, "user_id": user_id}) is not None
+    except Exception:
+        return False
+
+
+def get_nsfw_approved_users(chat_id: int) -> list:
+    col = _col("nsfw_approved")
+    if col is None:
+        return []
+    try:
+        return [doc["user_id"] for doc in col.find({"chat_id": chat_id}, {"user_id": 1})]
+    except Exception as e:
+        logger.error(f"[DB] get_nsfw_approved_users: {e}")
+        return []
