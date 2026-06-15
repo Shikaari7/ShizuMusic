@@ -7,6 +7,7 @@
 # --------------------------------------------------------------------------------
 
 import asyncio
+import json
 import os
 
 import aiohttp
@@ -17,7 +18,14 @@ from pyrogram.types import Message
 import config
 from ShizuMusic import bot, LOGGER
 from ShizuMusic.modules.block import user_allowed
-from ShizuMusic.utils.db import is_nsfw_enabled, set_nsfw_enabled
+from ShizuMusic.utils.db import (
+    is_nsfw_enabled,
+    set_nsfw_enabled,
+    approve_nsfw_user,
+    disapprove_nsfw_user,
+    is_nsfw_approved,
+    get_nsfw_approved_users,
+)
 from ShizuMusic.utils.permissions import is_user_authorized
 
 DOWNLOAD_DIR = "downloads/nsfw"
@@ -57,6 +65,8 @@ async def _scan_file(path: str, content_type: str) -> dict | None:
                     filename=os.path.basename(path),
                     content_type=content_type,
                 )
+                # Custom NSFW thresholds — config.NSFW_THRESHOLDS
+                data.add_field("thresholds", json.dumps(config.NSFW_THRESHOLDS))
                 headers = {"x-api-key": config.NSFW_API_KEY}
                 async with session.post(
                     f"{config.NSFW_API_URL}/detect/upload",
@@ -124,6 +134,29 @@ async def _auto_delete(message: Message, delay: int) -> None:
         pass
 
 
+async def _extract_user(client, message: Message, args: list):
+    """
+    Find the target user:
+      1. The sender of the replied-to message
+      2. /nsfwapprove <user_id|@username>
+
+    Returns None if nothing matches.
+    """
+    if message.reply_to_message and message.reply_to_message.from_user:
+        return message.reply_to_message.from_user
+
+    if args:
+        target = args[0]
+        try:
+            if target.lstrip("-").isdigit():
+                return await client.get_users(int(target))
+            return await client.get_users(target)
+        except Exception:
+            return None
+
+    return None
+
+
 # ── Report Builder ───────────────────────────────────────────────────────────
 
 def _build_report(result: dict) -> tuple[str, bool]:
@@ -133,10 +166,15 @@ def _build_report(result: dict) -> tuple[str, bool]:
     has_weapon    = result.get("has_weapon", False)
     has_drugs     = result.get("has_drugs", False)
     should_delete = result.get("should_delete", False)
+    thresholds    = result.get("thresholds_used", {}) or {}
 
+    threshold_line = ""
     if triggered:
         category   = triggered.capitalize()
         confidence = nsfw.get(triggered, 0) * 100
+        thr        = thresholds.get(triggered)
+        if thr is not None:
+            threshold_line = f"<b>🎯 Threshold:</b> {thr * 100:.0f}%\n"
     elif has_weapon:
         category   = "Weapon"
         confs      = [d["confidence"] for d in result.get("detections", []) if d["type"] == "weapon"]
@@ -158,7 +196,8 @@ def _build_report(result: dict) -> tuple[str, bool]:
         "<b>📊 NSFW Scan Result</b>\n\n"
         f"<b>🔞 Status:</b> {status}\n"
         f"<b>🚨 Category:</b> {category}\n"
-        f"<b>📈 Confidence:</b> {confidence:.1f}%\n\n"
+        f"<b>📈 Confidence:</b> {confidence:.1f}%\n"
+        f"{threshold_line}\n"
         f"<b>⚠️ Recommended Action:</b> {action}\n\n"
         f"<b>🛡️ Weapon:</b> {weapon_str}\n"
         f"<b>💊 Drugs:</b> {drugs_str}"
@@ -202,11 +241,75 @@ async def nsfw_toggle_cmd(_, message: Message) -> None:
         )
 
 
+# ── /nsfwapprove ──────────────────────────────────────────────────────────────
+@bot.on_message(filters.command("nsfwapprove") & filters.group & user_allowed)
+async def nsfw_approve_cmd(client, message: Message) -> None:
+    if not await is_user_authorized(message):
+        await message.reply(
+            "<b>❍ Only admins can use this command.</b>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    args = message.command[1:]
+
+    # /nsfwapprove list
+    if args and args[0].lower() == "list":
+        users = get_nsfw_approved_users(message.chat.id)
+        if not users:
+            await message.reply(
+                "<b>❍ No NSFW-approved users in this chat.</b>",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+        lines = "\n".join(f"• <code>{uid}</code>" for uid in users)
+        await message.reply(
+            f"<b>❍ NSFW-Approved Users:</b>\n{lines}",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # /nsfwapprove off
+    remove = bool(args) and args[-1].lower() in ("off", "remove", "-")
+    target_args = args[:-1] if remove else args
+
+    target = await _extract_user(client, message, target_args)
+    if target is None:
+        await message.reply(
+            "<b>❍ Reply to a user's message</b> (or provide their ID/username) "
+            "<b>along with</b> <code>/nsfwapprove</code> <b>to whitelist them from the NSFW filter.</b>\n\n"
+            "<b>❍ Usage:</b>\n"
+            "• <code>/nsfwapprove</code> — reply to approve\n"
+            "• <code>/nsfwapprove off</code> — reply to remove approval\n"
+            "• <code>/nsfwapprove list</code> — view approved users",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if remove:
+        disapprove_nsfw_user(message.chat.id, target.id)
+        await message.reply(
+            f"<b>❍</b> {target.mention} <b>removed from the NSFW-approved list ❌</b>\n"
+            f"<b>Their media/text will now be scanned again.</b>",
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        approve_nsfw_user(message.chat.id, target.id)
+        await message.reply(
+            f"<b>❍</b> {target.mention} <b>NSFW-Approved ✅</b>\n"
+            f"<b>Their media/text will not be scanned by the NSFW filter.</b>",
+            parse_mode=ParseMode.HTML,
+        )
+
+
 # ── Media Scanner — photo / video / gif / sticker / animation ───────────────
 
 @bot.on_message(MEDIA_FILTER & filters.group & user_allowed)
 async def nsfw_media_scan(client, message: Message) -> None:
     if not is_nsfw_enabled(message.chat.id):
+        return
+
+    if message.from_user and is_nsfw_approved(message.chat.id, message.from_user.id):
         return
 
     content_type = _media_content_type(message)
@@ -255,6 +358,9 @@ async def nsfw_media_scan(client, message: Message) -> None:
 @bot.on_message(filters.text & filters.group & not_command & user_allowed)
 async def nsfw_text_scan(client, message: Message) -> None:
     if not is_nsfw_enabled(message.chat.id):
+        return
+
+    if message.from_user and is_nsfw_approved(message.chat.id, message.from_user.id):
         return
 
     if len(message.text.strip()) < 2:
