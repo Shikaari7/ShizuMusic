@@ -7,6 +7,7 @@
 # --------------------------------------------------------------------------------
 
 import asyncio
+import html
 import json
 import os
 
@@ -21,6 +22,13 @@ from ShizuMusic.modules.block import user_allowed
 from ShizuMusic.utils.db import (
     is_nsfw_enabled,
     set_nsfw_enabled,
+    is_badword_enabled,
+    set_badword_enabled,
+    is_link_filter_enabled,
+    set_link_filter_enabled,
+    is_document_filter_enabled,
+    set_document_filter_enabled,
+    get_mod_settings,
     approve_nsfw_user,
     disapprove_nsfw_user,
     is_nsfw_approved,
@@ -84,7 +92,7 @@ async def _scan_file(path: str, content_type: str) -> dict | None:
 
 
 async def _scan_text(text: str) -> dict | None:
-    """Send plain text to the moderation API for bad-word checking."""
+    """Send plain text to the moderation API for bad-word + link checking."""
     try:
         async with aiohttp.ClientSession() as session:
             payload = {"text": text, "x_api_key": config.NSFW_API_KEY}
@@ -98,6 +106,28 @@ async def _scan_text(text: str) -> dict | None:
                 return await resp.json()
     except Exception as e:
         LOGGER.error(f"[nsfw] scan_text failed: {e}")
+        return None
+
+
+async def _check_document_api(filename: str) -> dict | None:
+    """
+    Ask the moderation API whether this filename is blocked. Filename only —
+    no upload needed. Mainly useful for custom extensions an admin added at
+    runtime via /blockedext/add on the API, beyond the local default list.
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            payload = {"filename": filename, "x_api_key": config.NSFW_API_KEY}
+            async with session.post(
+                f"{config.NSFW_API_URL}/document/check",
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                return await resp.json()
+    except Exception as e:
+        LOGGER.error(f"[nsfw] check_document_api failed: {e}")
         return None
 
 
@@ -132,6 +162,41 @@ async def _auto_delete(message: Message, delay: int) -> None:
         await message.delete()
     except Exception:
         pass
+
+
+# ── Blocked File Extensions ──────────────────────────────────────────────────
+
+def _blocked_extension(filename: str) -> str | None:
+    """Instant local check against config.BLOCKED_EXTENSIONS — no API call."""
+    if not filename:
+        return None
+    name = filename.lower()
+    for ext in config.BLOCKED_EXTENSIONS:
+        if name.endswith(ext):
+            return ext
+    return None
+
+
+def _build_blocked_file_report(filename: str, ext: str) -> str:
+    return (
+        "<b>🚫 File Deleted</b>\n\n"
+        f"<b>⚠️ Reason:</b> Blocked file type (<code>{html.escape(ext)}</code>)\n"
+        f"<b>📄 File:</b> <code>{html.escape(filename)}</code>\n\n"
+        f"<b>❍ Not allowed:</b> {', '.join(config.BLOCKED_EXTENSIONS)}"
+    )
+
+
+# ── Links ─────────────────────────────────────────────────────────────────
+
+def _build_link_report(links: list[str]) -> str:
+    shown = links[:5]
+    lines = "\n".join(f"• <code>{html.escape(l)}</code>" for l in shown)
+    more = f"\n<i>+{len(links) - 5} more</i>" if len(links) > 5 else ""
+    return (
+        "<b>🚫 Message Deleted</b>\n\n"
+        f"<b>⚠️ Reason:</b> Link detected\n"
+        f"<b>🔗 Found:</b>\n{lines}{more}"
+    )
 
 
 async def _extract_user(client, message: Message, args: list):
@@ -205,17 +270,16 @@ def _build_report(result: dict) -> tuple[str, bool]:
     return text, should_delete
 
 
-# ── /nsfw on|off ─────────────────────────────────────────────────────────────
+# ── Filter Toggle Commands (nsfw / badword / linkfilter / docfilter) ─────────
 
-@bot.on_message(filters.command("nsfw") & filters.group & user_allowed)
-async def nsfw_toggle_cmd(_, message: Message) -> None:
+async def _toggle_filter_cmd(message: Message, name: str, getter, setter, label: str) -> None:
     args = message.command[1:]
 
     if not args:
-        status = "ON ✅" if is_nsfw_enabled(message.chat.id) else "OFF ❌"
+        status = "ON ✅" if getter(message.chat.id) else "OFF ❌"
         await message.reply(
-            f"<b>❍ NSFW Filter is currently:</b> {status}\n"
-            f"<b>❍ Usage:</b> <code>/nsfw on</code> | <code>/nsfw off</code>",
+            f"<b>❍ {label} is currently:</b> {status}\n"
+            f"<b>❍ Usage:</b> <code>/{name} on</code> | <code>/{name} off</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -229,16 +293,58 @@ async def nsfw_toggle_cmd(_, message: Message) -> None:
 
     arg = args[0].lower()
     if arg == "on":
-        set_nsfw_enabled(message.chat.id, True)
-        await message.reply("<b>❍ NSFW Filter Enabled ✅</b>", parse_mode=ParseMode.HTML)
+        setter(message.chat.id, True)
+        await message.reply(f"<b>❍ {label} Enabled ✅</b>", parse_mode=ParseMode.HTML)
     elif arg == "off":
-        set_nsfw_enabled(message.chat.id, False)
-        await message.reply("<b>❍ NSFW Filter Disabled ❌</b>", parse_mode=ParseMode.HTML)
+        setter(message.chat.id, False)
+        await message.reply(f"<b>❍ {label} Disabled ❌</b>", parse_mode=ParseMode.HTML)
     else:
         await message.reply(
-            "<b>❍ Usage:</b> <code>/nsfw on</code> | <code>/nsfw off</code>",
+            f"<b>❍ Usage:</b> <code>/{name} on</code> | <code>/{name} off</code>",
             parse_mode=ParseMode.HTML,
         )
+
+
+@bot.on_message(filters.command("nsfw") & filters.group & user_allowed)
+async def nsfw_toggle_cmd(_, message: Message) -> None:
+    await _toggle_filter_cmd(message, "nsfw", is_nsfw_enabled, set_nsfw_enabled, "NSFW Filter")
+
+
+@bot.on_message(filters.command("badword") & filters.group & user_allowed)
+async def badword_toggle_cmd(_, message: Message) -> None:
+    await _toggle_filter_cmd(message, "badword", is_badword_enabled, set_badword_enabled, "Bad-Word Filter")
+
+
+@bot.on_message(filters.command(["linkfilter", "link"]) & filters.group & user_allowed)
+async def link_toggle_cmd(_, message: Message) -> None:
+    await _toggle_filter_cmd(message, "linkfilter", is_link_filter_enabled, set_link_filter_enabled, "Link Filter")
+
+
+@bot.on_message(filters.command(["docfilter", "filefilter"]) & filters.group & user_allowed)
+async def doc_toggle_cmd(_, message: Message) -> None:
+    await _toggle_filter_cmd(message, "docfilter", is_document_filter_enabled, set_document_filter_enabled, "Document Filter")
+
+
+@bot.on_message(filters.command("filters") & filters.group & user_allowed)
+async def filters_status_cmd(_, message: Message) -> None:
+    s = get_mod_settings(message.chat.id)
+
+    def mark(v: bool) -> str:
+        return "ON ✅" if v else "OFF ❌"
+
+    text = (
+        "<b>🛡️ Moderation Filters</b>\n\n"
+        f"<b>🔞 NSFW (media):</b> {mark(s['nsfw'])}\n"
+        f"<b>🤬 Bad Words:</b> {mark(s['badword'])}\n"
+        f"<b>🔗 Links:</b> {mark(s['link'])}\n"
+        f"<b>📁 Blocked Files:</b> {mark(s['document'])}\n\n"
+        "<b>❍ Toggle individually:</b>\n"
+        "• <code>/nsfw on|off</code>\n"
+        "• <code>/badword on|off</code>\n"
+        "• <code>/linkfilter on|off</code>\n"
+        "• <code>/docfilter on|off</code>"
+    )
+    await message.reply(text, parse_mode=ParseMode.HTML)
 
 
 # ── /nsfwapprove ──────────────────────────────────────────────────────────────
@@ -289,15 +395,15 @@ async def nsfw_approve_cmd(client, message: Message) -> None:
     if remove:
         disapprove_nsfw_user(message.chat.id, target.id)
         await message.reply(
-            f"<b>❍</b> {target.mention} <b>removed from the NSFW-approved list ❌</b>\n"
-            f"<b>Their media/text will now be scanned again.</b>",
+            f"<b>❍</b> {target.mention} <b>removed from the approved list ❌</b>\n"
+            f"<b>Their media/text/files/links will now be checked again.</b>",
             parse_mode=ParseMode.HTML,
         )
     else:
         approve_nsfw_user(message.chat.id, target.id)
         await message.reply(
-            f"<b>❍</b> {target.mention} <b>NSFW-Approved ✅</b>\n"
-            f"<b>Their media/text will not be scanned by the NSFW filter.</b>",
+            f"<b>❍</b> {target.mention} <b>Approved ✅</b>\n"
+            f"<b>Their media/text/files/links will bypass all moderation filters.</b>",
             parse_mode=ParseMode.HTML,
         )
 
@@ -306,10 +412,36 @@ async def nsfw_approve_cmd(client, message: Message) -> None:
 
 @bot.on_message(MEDIA_FILTER & filters.group & user_allowed)
 async def nsfw_media_scan(client, message: Message) -> None:
-    if not is_nsfw_enabled(message.chat.id):
-        return
+    chat_id = message.chat.id
+    bypass = bool(message.from_user) and is_nsfw_approved(chat_id, message.from_user.id)
 
-    if message.from_user and is_nsfw_approved(message.chat.id, message.from_user.id):
+    # ── 1. Blocked file-extension check — independent toggle, runs first ───
+    if message.document and not bypass and is_document_filter_enabled(chat_id):
+        filename = message.document.file_name or ""
+        ext = _blocked_extension(filename)               # instant local check
+        if not ext:
+            api_result = await _check_document_api(filename)  # custom list on API
+            if api_result and api_result.get("blocked"):
+                ext = api_result.get("extension") or os.path.splitext(filename.lower())[1]
+
+        if ext:
+            try:
+                await message.delete()
+            except Exception as e:
+                LOGGER.warning(f"[nsfw] could not delete blocked file: {e}")
+
+            user = message.from_user
+            header = f"<b>👤 User:</b> {user.mention}\n\n" if user else ""
+            sent = await client.send_message(
+                chat_id,
+                header + _build_blocked_file_report(filename, ext),
+                parse_mode=ParseMode.HTML,
+            )
+            asyncio.create_task(_auto_delete(sent, REPORT_AUTO_DELETE))
+            return  # already handled — skip the NSFW scan below
+
+    # ── 2. NSFW image/video scan ─────────────────────────────────────────
+    if not is_nsfw_enabled(chat_id) or bypass:
         return
 
     content_type = _media_content_type(message)
@@ -346,7 +478,7 @@ async def nsfw_media_scan(client, message: Message) -> None:
     user   = message.from_user
     header = f"<b>👤 User:</b> {user.mention}\n\n" if user else ""
     sent = await client.send_message(
-        message.chat.id,
+        chat_id,
         header + report_text,
         parse_mode=ParseMode.HTML,
     )
@@ -357,17 +489,44 @@ async def nsfw_media_scan(client, message: Message) -> None:
 
 @bot.on_message(filters.text & filters.group & not_command & user_allowed)
 async def nsfw_text_scan(client, message: Message) -> None:
-    if not is_nsfw_enabled(message.chat.id):
+    chat_id = message.chat.id
+
+    if message.from_user and is_nsfw_approved(chat_id, message.from_user.id):
         return
 
-    if message.from_user and is_nsfw_approved(message.chat.id, message.from_user.id):
+    link_on    = is_link_filter_enabled(chat_id)
+    badword_on = is_badword_enabled(chat_id)
+    if not link_on and not badword_on:
         return
 
     if len(message.text.strip()) < 2:
         return
 
+    # Single API call covers both checks — /text/check returns has_link/links
+    # alongside has_bad_words/toxicity_score.
     result = await _scan_text(message.text)
-    if not result or not result.get("has_bad_words"):
+    if not result:
+        return  # API unreachable — fail silently, don't block the chat
+
+    # ── 1. Link filter ───────────────────────────────────────────────────
+    if link_on and result.get("has_link"):
+        try:
+            await message.delete()
+        except Exception as e:
+            LOGGER.warning(f"[nsfw] could not delete link message: {e}")
+
+        user   = message.from_user
+        header = f"<b>👤 User:</b> {user.mention}\n\n" if user else ""
+        sent = await client.send_message(
+            chat_id,
+            header + _build_link_report(result.get("links", [])),
+            parse_mode=ParseMode.HTML,
+        )
+        asyncio.create_task(_auto_delete(sent, REPORT_AUTO_DELETE))
+        return  # message already gone — no point bad-word checking it too
+
+    # ── 2. Bad-word filter ───────────────────────────────────────────────
+    if not badword_on or not result.get("has_bad_words"):
         return
 
     try:
@@ -386,7 +545,7 @@ async def nsfw_text_scan(client, message: Message) -> None:
         f"<b>📈 Toxicity:</b> {toxicity:.0f}%"
     )
     sent = await client.send_message(
-        message.chat.id,
+        chat_id,
         warn_text,
         parse_mode=ParseMode.HTML,
     )
