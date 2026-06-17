@@ -50,3 +50,16 @@ START_ANIMATIONS = [
 MAX_DURATION_SECONDS = 1800   # 30 minutes
 QUEUE_LIMIT          = 20
 COOLDOWN             = 10     # seconds between /play per chat
+
+
+BLOCKED_EXTENSIONS = [
+    ".zip",
+    ".rar",
+    ".7z",
+    ".apk",
+    ".exe",
+    ".py",
+    ".js",
+    ".go",
+    ".php",
+]
