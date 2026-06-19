@@ -79,7 +79,7 @@ async def start_handler(_, message: Message) -> None:
                                   callback_data="show_help")],
             [
                 InlineKeyboardButton("ᴏᴡɴᴇʀ",
-                                     url=f"t.me/JK_SHIKAARI"),
+                                     url=f"t.me/i_SHIKAARI"),
             ],
         ])
 
