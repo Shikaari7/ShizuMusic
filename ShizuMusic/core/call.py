@@ -188,4 +188,4 @@ async def on_stream_end(_: object, update: StreamEnded) -> None:
             "<b>❍ ǫᴜᴇᴜᴇ ꜰɪɴɪꜱʜᴇᴅ</b>\n"
             "<b>❍ ʟᴇꜰᴛ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ.</b>",
             parse_mode=ParseMode.HTML,
-                    )
+        )
