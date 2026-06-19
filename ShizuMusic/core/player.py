@@ -406,7 +406,7 @@ async def play_song(
 
     caption = (
         "<blockquote>"
-        "<b>🎧 Sʜɪᴢᴜ Mᴜsɪᴄ</b>\n\n"
+        "<b>🎧 ꜱʜɪᴋᴀᴀʀɪ χ ᴍᴜꜱɪᴄ</b>\n\n"
         f"<b>❍ ᴛɪᴛʟᴇ :</b> {short(song['title'])}\n"
         f"<b>❍ ᴅᴜʀ :</b> {song.get('duration', '?')}\n"
         f"<b>❍ ʙʏ :</b> {song['requester']}"
@@ -476,4 +476,4 @@ async def play_song(
                 f"• <b>ʙʏ :</b> {song.get('requester')}",
                 parse_mode=ParseMode.HTML,
             )
-         )
+    )
