@@ -96,7 +96,7 @@ async def _seek_to(chat_id: int, target_sec: int, message: Message) -> None:
 
     caption = (
         "<blockquote>"
-        "<b>🎧 Sʜɪᴢᴜ Mᴜsɪᴄ</b>\n\n"
+        "<b>🎧 ꜱʜɪᴋᴀᴀʀɪ ᴍᴜꜱɪᴄ</b>\n\n"
         f"<b>❍ Title :</b> {short(song['title'])}\n"
         f"<b>❍ Duration :</b> {song.get('duration', '?')}\n"
         f"<b>❍ By :</b> {song['requester']}\n"
@@ -230,4 +230,4 @@ async def seek_usage(_, message: Message) -> None:
             "<code>/seek 30</code>     → forward 30 seconds\n"
             "<code>/seekback 30</code> → backward 30 seconds",
             parse_mode=ParseMode.HTML,
-        )
+    )
