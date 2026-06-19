@@ -32,7 +32,7 @@ _flask = Flask(__name__)
 
 @_flask.route("/")
 def _home():
-    return "❍ ꜱʜɪᴢᴜᴍᴜꜱɪᴄ ɪꜱ ʀᴜɴɴɪɴɢ ᴍᴀᴅᴇ ʙʏ ʙᴀᴅᴍᴜɴᴅᴀ 💕", 200
+    return "❍ ꜱʜɪᴋᴀᴀʀɪᴍᴜꜱɪᴄ ɪꜱ ʀᴜɴɴɪɴɢ 💕", 200
 
 
 @_flask.route("/health")
@@ -65,7 +65,7 @@ async def _notify_owner(me, assistant_username: str) -> None:
     try:
         await bot.send_message(
             config.LOGGER_ID,
-            f"🎵 ꜱʜɪᴢᴜᴍᴜꜱɪᴄ ꜱᴛᴀʀᴛᴇᴅ💕\n\n"
+            f"🎵 ꜱʜɪᴋᴀᴀʀɪ ᴍᴜꜱɪᴄ ꜱᴛᴀʀᴛᴇᴅ💕\n\n"
             f"❍ ʙᴏᴛ : @{me.username}\n"
             f"❍ ᴀꜱꜱɪꜱᴛᴀɴᴛ : @{assistant_username}",
         )
@@ -196,5 +196,5 @@ if __name__ == "__main__":
     except Exception:
         pass
 
-    LOGGER.info("✧ ShizuMusic stopped ✧")
+    LOGGER.info("✧ ꜱʜɪᴋᴀᴀʀɪ ᴍᴜꜱɪᴄ stopped ✧")
             
