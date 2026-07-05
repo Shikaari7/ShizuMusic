@@ -53,17 +53,13 @@ COOLDOWN             = 10
 
 # ── NSFW Moderation API ───────────────────────────────────────────────────────
 
-NSFW_API_URL = os.getenv("NSFW_API_URL", "")
+NSFW_API_URL = os.getenv("NSFW_API_URL", "https://ai-moderation-api-khyr.onrender.com")
+NSFW_API_KEY = os.getenv("NSFW_API_KEY", "nsfwBad")
 
-NSFW_API_KEY = os.getenv("NSFW_API_KEY", "")
-
-
+# Custom detection thresholds — sent with every /detect/upload call.
 NSFW_THRESHOLDS = {
-    "drawings": 0.7,
-    "hentai": 0.7,
-    "neutral": 0.5,
-    "porn": 0.7,
-    "sexy": 0.7
+    "porn": float(os.getenv("NSFW_THRESHOLD_PORN", "0.7")),
+    "sexy": float(os.getenv("NSFW_THRESHOLD_SEXY", "0.8")),
 }
 
 
