@@ -450,7 +450,7 @@ async def _go_back(cbq: CallbackQuery) -> None:
                               callback_data="show_help")],
         [
             InlineKeyboardButton("ᴏᴡɴᴇʀ",
-                                 url=f"t.me/i_SHIKAARI"),
+                                 url=f"t.me/The_SHIKAARI"),
         ],
     ])
 
