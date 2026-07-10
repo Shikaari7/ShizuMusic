@@ -90,7 +90,7 @@ async def stats_cmd(_, message: Message) -> None:
 
     # ── Final message ─────────────────────────────────────────────────────────
     text = (
-        "<b>━━━━━━━━ ShikaariMusic Stats ━━━━━━━━</b>\n\n"
+        "<b>━━━━━━━━ ShikaariMusic Stats ━━━━━━━</b>\n\n"
 
         "<b>❍ System</b>\n"
         f"<b>  OS        :</b> <code>{os_name} {os_release}</code>\n"
@@ -124,7 +124,7 @@ async def stats_cmd(_, message: Message) -> None:
         f"<b>  Groups  :</b> <code>{bc['groups']}</code>\n"
         f"<b>  Users   :</b> <code>{bc['private']}</code>\n\n"
 
-        "<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>"
     )
 
     await processing.edit_text(text, parse_mode=ParseMode.HTML)
