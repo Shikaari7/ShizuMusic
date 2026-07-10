@@ -566,6 +566,38 @@ def is_nsfw_approved(chat_id: int, user_id: int) -> bool:
 
 
 def get_nsfw_approved_users(chat_id: int) -> list:
+
+    # ── Sudo Users ───────────────────────────────────────────────────────────────
+
+def add_sudo(user_id: int) -> None:
+    col = _col("sudo_users")
+    if col is None:
+        return
+    try:
+        col.update_one({"_id": user_id}, {"$set": {"_id": user_id}}, upsert=True)
+    except Exception as e:
+        logger.error(f"[DB] add_sudo: {e}")
+
+
+def del_sudo(user_id: int) -> None:
+    col = _col("sudo_users")
+    if col is None:
+        return
+    try:
+        col.delete_one({"_id": user_id})
+    except Exception as e:
+        logger.error(f"[DB] del_sudo: {e}")
+
+
+def get_sudoers() -> list:
+    col = _col("sudo_users")
+    if col is None:
+        return []
+    try:
+        return [doc["_id"] for doc in col.find({}, {"_id": 1})]
+    except Exception as e:
+        logger.error(f"[DB] get_sudoers: {e}")
+        return []
     col = _col("nsfw_approved")
     if col is None:
         return []
