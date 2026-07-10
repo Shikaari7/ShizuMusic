@@ -1,11 +1,3 @@
-# --------------------------------------------------------------------------------
-#  ShizuMusic © 2026
-#  Developed by Bad Munda ❤️
-#
-#  Unauthorized copying, editing, re-uploading or removing credits
-#  from this source code is strictly prohibited.
-# --------------------------------------------------------------------------------
-
 import platform
 import sys
 
@@ -98,7 +90,7 @@ async def stats_cmd(_, message: Message) -> None:
 
     # ── Final message ─────────────────────────────────────────────────────────
     text = (
-        "<b>━━━━━━━━ ShizuMusic Stats ━━━━━━━━</b>\n\n"
+        "<b>━━━━━━━━ ShikaariMusic Stats ━━━━━━━━</b>\n\n"
 
         "<b>❍ System</b>\n"
         f"<b>  OS        :</b> <code>{os_name} {os_release}</code>\n"
