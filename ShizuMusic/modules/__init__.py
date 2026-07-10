@@ -17,4 +17,5 @@ ALL_MODULES = [
     "start",
     "seek",
     "sudoers",
+    "tagall",
 ]
