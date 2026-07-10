@@ -566,8 +566,17 @@ def is_nsfw_approved(chat_id: int, user_id: int) -> bool:
 
 
 def get_nsfw_approved_users(chat_id: int) -> list:
+    col = _col("nsfw_approved")
+    if col is None:
+        return []
+    try:
+        return [doc["user_id"] for doc in col.find({"chat_id": chat_id}, {"user_id": 1})]
+    except Exception as e:
+        logger.error(f"[DB] get_nsfw_approved_users: {e}")
+        return [] 
 
-    # ── Sudo Users ───────────────────────────────────────────────────────────────
+
+# ── Sudo Users ───────────────────────────────────────────────────────────────
 
 def add_sudo(user_id: int) -> None:
     col = _col("sudo_users")
@@ -597,12 +606,4 @@ def get_sudoers() -> list:
         return [doc["_id"] for doc in col.find({}, {"_id": 1})]
     except Exception as e:
         logger.error(f"[DB] get_sudoers: {e}")
-        return []
-    col = _col("nsfw_approved")
-    if col is None:
-        return []
-    try:
-        return [doc["user_id"] for doc in col.find({"chat_id": chat_id}, {"user_id": 1})]
-    except Exception as e:
-        logger.error(f"[DB] get_nsfw_approved_users: {e}")
         return []
