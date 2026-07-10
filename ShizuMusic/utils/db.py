@@ -576,34 +576,35 @@ def get_nsfw_approved_users(chat_id: int) -> list:
         return [] 
 
 
-# ── Sudo Users ───────────────────────────────────────────────────────────────
+# ── Sudo Users ─────────────────────────────────────────
 
 def add_sudo(user_id: int) -> None:
     col = _col("sudo_users")
     if col is None:
         return
-    try:
-        col.update_one({"_id": user_id}, {"$set": {"_id": user_id}}, upsert=True)
-    except Exception as e:
-        logger.error(f"[DB] add_sudo: {e}")
+    col.update_one(
+        {"_id": user_id},
+        {"$set": {"_id": user_id}},
+        upsert=True,
+    )
 
 
-def del_sudo(user_id: int) -> None:
+def remove_sudo(user_id: int) -> None:
     col = _col("sudo_users")
     if col is None:
         return
-    try:
-        col.delete_one({"_id": user_id})
-    except Exception as e:
-        logger.error(f"[DB] del_sudo: {e}")
+    col.delete_one({"_id": user_id})
 
 
-def get_sudoers() -> list:
+def is_sudo(user_id: int) -> bool:
+    col = _col("sudo_users")
+    if col is None:
+        return False
+    return col.find_one({"_id": user_id}) is not None
+
+
+def get_sudo_users() -> list:
     col = _col("sudo_users")
     if col is None:
         return []
-    try:
-        return [doc["_id"] for doc in col.find({}, {"_id": 1})]
-    except Exception as e:
-        logger.error(f"[DB] get_sudoers: {e}")
-        return []
+    return [x["_id"] for x in col.find({}, {"_id": 1})]
