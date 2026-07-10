@@ -1,52 +1,107 @@
-from pyrogram import filters, types
+from pyrogram import filters
+from pyrogram.enums import ParseMode
+from pyrogram.types import Message
 
-from ShizuMusic import app, db, lang
-from ShizuMusic.helpers import utils
+import config
+from ShizuMusic import bot
+from ShizuMusic.utils.db import (
+    add_sudo,
+    remove_sudo,
+    is_sudo,
+    get_sudo_users,
+)
 
 
-@app.on_message(filters.command(["addsudo", "delsudo", "rmsudo", "hoii"]) & filters.user(app.owner))
-@lang.language()
-async def _sudo(_, m: types.Message):
-    user = await utils.extract_user(m)
-    if not user:
-        return await m.reply_text(m.lang["user_not_found"])
+def sudo_filter(_, __, message):
+    if not message.from_user:
+        return False
 
-    if m.command[0] == "addsudo":
-        if user.id in app.sudoers:
-            return await m.reply_text(m.lang["sudo_already"].format(user.mention))
+    if message.from_user.id == config.OWNER_ID:
+        return True
 
-        app.sudoers.add(user.id)
-        await db.add_sudo(user.id)
-        await m.reply_text(m.lang["sudo_added"].format(user.mention))
+    return is_sudo(message.from_user.id)
+
+
+sudo = filters.create(sudo_filter)
+
+
+@bot.on_message(filters.command("addsudo") & filters.user(config.OWNER_ID))
+async def addsudo(_, message: Message):
+    if message.reply_to_message:
+        user = message.reply_to_message.from_user
+    elif len(message.command) > 1:
+        user = await bot.get_users(int(message.command[1]))
     else:
-        if user.id not in app.sudoers:
-            return await m.reply_text(m.lang["sudo_not"].format(user.mention))
+        return await message.reply_text(
+            "Reply to a user or give a user ID."
+        )
 
-        app.sudoers.discard(user.id)
-        await db.del_sudo(user.id)
-        await m.reply_text(m.lang["sudo_removed"].format(user.mention))
+    if user.id == config.OWNER_ID:
+        return await message.reply_text("Owner is already supreme.")
+
+    if is_sudo(user.id):
+        return await message.reply_text("User is already sudo.")
+
+    add_sudo(user.id)
+
+    await message.reply_text(
+        f"✅ Added <b>{user.mention}</b> as Sudo User.",
+        parse_mode=ParseMode.HTML,
+    )
 
 
-o_mention = None
+@bot.on_message(filters.command("delsudo") & filters.user(config.OWNER_ID))
+async def delsudo(_, message: Message):
+    if message.reply_to_message:
+        user = message.reply_to_message.from_user
+    elif len(message.command) > 1:
+        user = await bot.get_users(int(message.command[1]))
+    else:
+        return await message.reply_text(
+            "Reply to a user or give a user ID."
+        )
 
-@app.on_message(filters.command(["listsudo", "sudolist"]))
-@lang.language()
-async def _listsudo(_, m: types.Message):
-    global o_mention
-    sent = await m.reply_text(m.lang["sudo_fetching"])
+    if not is_sudo(user.id):
+        return await message.reply_text("User is not sudo.")
 
-    if not o_mention:
-        o_mention = (await app.get_users(app.owner)).mention
-    txt = m.lang["sudo_owner"].format(o_mention)
-    sudoers = await db.get_sudoers()
-    if sudoers:
-        txt += m.lang["sudo_users"]
+    remove_sudo(user.id)
 
-    for user_id in sudoers:
-        try:
-            user = (await app.get_users(user_id)).mention
-            txt += f"\n- {user}"
-        except Exception:
-            continue
+    await message.reply_text(
+        f"✅ Removed <b>{user.mention}</b> from Sudo Users.",
+        parse_mode=ParseMode.HTML,
+    )
 
-    await sent.edit_text(txt)
+
+@bot.on_message(filters.command(["sudolist", "listsudo"]))
+async def sudolist(_, message: Message):
+    ids = get_sudo_users()
+
+    text = "<b>🛡 Sudo Users</b>\n\n"
+
+    if not ids:
+        text += "No sudo users."
+    else:
+        for uid in ids:
+            try:
+                user = await bot.get_users(uid)
+                text += f"• {user.mention} (<code>{uid}</code>)\n"
+            except Exception:
+                text += f"• <code>{uid}</code>\n"
+
+    await message.reply_text(
+        text,
+        parse_mode=ParseMode.HTML,
+    )
+
+
+@bot.on_message(filters.command("issudo"))
+async def issudo_cmd(_, message: Message):
+    uid = message.from_user.id
+
+    if uid == config.OWNER_ID:
+        return await message.reply_text("👑 You are the Owner.")
+
+    if is_sudo(uid):
+        return await message.reply_text("✅ You are a Sudo User.")
+
+    await message.reply_text("❌ You are not a Sudo User.")
