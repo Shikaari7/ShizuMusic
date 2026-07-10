@@ -1,11 +1,3 @@
-# --------------------------------------------------------------------------------
-#  ShizuMusic © 2026
-#  Developed by Bad Munda ❤️
-#
-#  Unauthorized copying, editing, re-uploading or removing credits
-#  from this source code is strictly prohibited.
-# --------------------------------------------------------------------------------
-
 import asyncio
 
 from pyrogram.enums import ParseMode
@@ -88,6 +80,12 @@ _HELP_TEXTS = {
         "<b>├────────────────────▣</b>\n"
         "<b>│❍ /reboot</b>\n"
         "<b>│   ʀᴇsᴇᴛ ᴄʜᴀᴛ sᴛᴀᴛᴇ & ʟᴇᴀᴠᴇ ᴠᴄ</b>\n"
+        "<b>├────────────────────▣</b>\n"
+        "<b>│❍ /tagall</b> <code>&lt;message&gt;</code>\n"
+        "<b>│   ᴛᴀɢ ᴀʟʟ ɢʀᴏᴜᴘ ᴍᴇᴍʙᴇʀs</b>\n"
+        "<b>├────────────────────▣</b>\n"
+        "<b>│❍ /canceltag</b>\n"
+        "<b>│   sᴛᴏᴘ ʀᴜɴɴɪɴɢ ᴛᴀɢ ᴀʟʟ</b>\n"
         "<b>╰────────────────────▣</b>"
     ),
 
