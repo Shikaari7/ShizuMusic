@@ -46,7 +46,7 @@ START_ANIMATIONS = [
 
 # ── Limits ────────────────────────────────────────────────────────────────────
 
-MAX_DURATION_SECONDS = 1800
+MAX_DURATION_SECONDS = 3500
 QUEUE_LIMIT          = 20
 COOLDOWN             = 10
 
